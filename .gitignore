@@ -1,3 +1,6 @@
+# ignore any folder named `data/` within folders named `week__` (* acts as a wildcard)
+/week*/data/
+
 # History files
 .Rhistory
 .Rapp.history
