@@ -1,0 +1,141 @@
+---
+title: "EDS 240 Lecture 1.3"
+date: 2024-01-08
+format: html
+---
+
+[Lecture 1.3 slides](https://samanthacsik.github.io/EDS-240-data-viz/slides/week1.3-ggplot-review-slides.html#/why-untidy-temps)
+
+# Load packages
+```{r}
+library(tidyverse)
+library(palmerpenguins)
+```
+
+## Tidy data
+```{r}
+# untidy data ----
+temp_data_wide <- tribble(
+  ~date, ~station1, ~station2,  ~station3,
+  "2023-10-01", 30.1, 29.8,  31.2,
+  "2023-11-01", 28.6, 29.1,  33.4,
+  "2023-12-01", 29.9, 28.5,  32.3
+)
+
+temp_data_wide
+
+# not one row per observation! 
+
+# make tidy ----
+temp_data_long <- temp_data_wide |> # pipe operator! (command shift m)
+  # new function! pivot_longer
+  pivot_longer(cols = starts_with("station"), #using function "starts_with" takes all cols that start with x
+               names_to = "station_id", # arg for pivot_longer, this is the new col name for the category
+               values_to = "temp_c") # arg for pivot_longer, new col name for the values
+
+temp_data_long
+```
+
+```{r}
+# Exploration 
+unique(penguins$species)
+
+# "nunique" cousin in R
+length(unique(penguins$species))
+```
+## Plot 1
+```{r}
+# ggplot(data = penguins,
+#       mapping = aes(x = bill_length_mm,
+#                     y = bill_depth_mm))
+
+# note, you don't need the "mapping =", as long as you have it in the correct order (data then mapping)
+
+# you can pipe into a ggplot!, then you will need to use plus signs for each additional layer
+# penguins %>% 
+#  ggplot(aes(x = bill_length_mm, y = bill_depth_mm))
+
+
+# mapping color globally
+ggplot(na.omit(penguins), aes(x = bill_length_mm, # "wrapping the data with na.omit"
+                              y = bill_depth_mm,
+                              color = species)) + #use an aesthetic to represent your variable, goes in aes
+  geom_point() +
+  geom_smooth(method="lm") +
+  scale_color_manual(values = c("darkorange", "purple", "cyan4"))  # pick colors; note num of colors = num of vars
+
+# mapping color locally
+ggplot(na.omit(penguins), aes(x = bill_length_mm, # "wrapping the data with na.omit"
+                              y = bill_depth_mm)) + 
+  geom_point(aes(color=species)) + # this is "local" 
+  geom_smooth(method="lm") # note: just one line across all species
+
+# color gradient
+ggplot(penguins, aes(x = body_mass_g,
+                     y = flipper_length_mm,
+                     color = body_mass_g)) +
+  geom_point() +
+  scale_color_gradient(low = "blue", high = "yellow")
+```
+## Plot 2
+
+```{r}
+# if we don't specify the y, we will get the counts 
+# note the documentation for geom_bar, stat = "count"
+
+ggplot(penguins, aes(x = species)) +
+  geom_bar()
+```
+
+Overriding geom_bar's stat:
+```{r}
+penguin_summary <- penguins |> 
+  count(species) # calculate number of observations (rows) for each species
+
+ggplot(penguin_summary, aes(x = species, y = n)) + 
+  geom_bar(stat = "identity")
+```
+Overriding geom_bar's stat mapping:
+```{r}
+ggplot(penguins, aes(x = species, y = after_stat(prop), group = 1)) +
+  geom_bar()
+```
+Position adjustments
+```{r}
+# default position = "stack"
+ggplot(penguins, aes(x = species, fill = island)) + # fill and color are similar but used for different geoms
+  geom_bar(position = position_dodge2(preserve = "single")) 
+
+# fill calculates a proportion
+# dodge splits it
+# there are position functions you can apply to position!
+```
+
+coordinate systems + themes
+```{r}
+ggplot(penguins, aes(x = species)) +
+  geom_bar() +
+  coord_cartesian() # you don't need to explicitly include `coord_cartesian()` since it's the default
+
+# coord flip
+ggplot(penguins, aes(x = species)) +
+  geom_bar() +
+  coord_flip() +
+  theme_light()
+
+# polar coordinate system
+ggplot(penguins, aes(x = species)) +
+  geom_bar() +
+  coord_polar() +
+  theme(
+    axis.title = element_text(size = 17, color = "purple")
+  )
+```
+
+histogram next week
+```{r}
+ggplot(penguins, aes(x = flipper_length_mm)) + 
+  geom_histogram()
+```
+
+
