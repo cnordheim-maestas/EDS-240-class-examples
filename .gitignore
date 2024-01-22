@@ -1,4 +1,8 @@
 # ignore any folder named `data/` within folders named `week__` (* acts as a wildcard!)
+KEYS.R
+
+/week3/KEYS.R
+
 /week*/data/
 
 # History files
