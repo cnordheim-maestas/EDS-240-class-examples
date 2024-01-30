@@ -1,0 +1,321 @@
+---
+title: "lab3"
+format: html
+---
+
+class notes:
+
+stacked area plot
+
+- good at minimizing space
+- bad at getting at exact values and how different things are relative to each other
+
+stacked bar plot:
+
+- good at minimizing space use
+- bad at getting at exact values and how different things are relative to each other
+
+```{r}
+##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+##                                    setup                                 ----
+##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+#..........................load packages.........................
+library(tidyverse)
+
+#..........................import data...........................
+tuesdata <- tidytuesdayR::tt_load('2021-07-20')
+drought <- tuesdata$drought
+
+##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+##                       data vis: in lab exercise                          ----
+##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+# subset
+drought_subset <- drought %>%
+  filter(state_abb == c("CA", "OR", "WA"))
+
+# make a plot
+
+drought_subset |> 
+  ggplot(drought_subset, mapping = aes(x = area_pct, y = state_abb, fill = after_stat(x))) +
+  ggridges::geom_density_ridges_gradient() +
+  scale_fill_gradientn(colors = c("#2C5374","#849BB4", "#D9E7EC", "#EF8080", "#8B3A3A"))
+
+
+##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+##                            wrangle drought data                          ----
+##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+drought_clean <- drought |>
+
+  # select cols of interest & update names as needed ----
+# this wrangling is important because: easier to catch mistakes, less data to deal with
+  select(date = valid_start, state_abb, drought_lvl, area_pct) |> 
+
+  # add year, month & day cols using {lubridate} fxns ----
+# this wrangling is important because: we want to plot by/ group by year
+  mutate(year = year(date),
+         month = month(date, label = TRUE, abbr = TRUE),
+         day = day(date)) |>
+
+  # add drought level conditions names ----
+# this wrangling is important because: aesthetics/ logical order
+  mutate(drought_lvl_long = factor(drought_lvl,
+                            levels = c("D4", "D3", "D2", "D1","D0", "None"),
+                            labels = c("(D4) Exceptional", "(D3) Extreme",
+                                       "(D2) Severe", "(D1) Moderate", "(D0) Abnormally Dry", 
+                                       "No Drought"))) |>
+  
+  # reorder cols ----
+  select(date, year, month, day, state_abb, drought_lvl, drought_lvl_long, area_pct)
+
+##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+##       create stacked area plot of CA drought conditions through time     ----
+##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+# this wrangling is important because: 
+
+drought_clean |> 
+  
+  # remove drought_lvl "None" & filter for just CA ----
+# this wrangling is important because: smaller dataset easier to assess trends, and faster rendering speed
+  filter(drought_lvl != "None",
+         state_abb == "CA") |> 
+  
+  # create ggplot ----
+  ggplot(mapping = aes(x = date, y = area_pct, fill = drought_lvl_long)) +
+  
+  # reverse order of groups so level D4 is closest to x-axis ----
+  geom_area(position = position_stack(reverse = TRUE)) +
+  
+  # update colors to match US Drought Monitor (colors selected using ColorPick Eyedropper from original USDM data viz) ----
+  scale_fill_manual(values = c("#853904", "#FF0000", "#FFC100", "#FFD965", "#FFFF00")) +
+  
+  # set x-axis breaks & remove padding between data and x-axis ----
+  scale_x_date(breaks = scales::breaks_pretty(n = 10),
+               expand = c(0, 0)) +
+
+  # set y-axis breaks & convert values to percentages & & remove padding between data and y-axis----
+  scale_y_continuous(breaks = seq(0, 100, by = 10),
+                     labels = scales::label_percent(scale = 1),
+                     expand = c(0, 0)) +
+  
+  # add title ----
+  labs(title = "Drought area in California") 
+
+##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+##            BONUS: using {geofacet} to plot data for all states           ----
+##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+#......remove HI & AK (no data) and also DC from preset grid.....
+mygrid <- geofacet::us_state_grid1 |>
+  filter(!code %in% c("DC", "HI", "AK"))
+
+#..............................plot..............................
+
+# NOTE: this takes a minute to render!
+
+drought_clean |> 
+  filter(drought_lvl != "None") |> 
+  ggplot(aes(x = date, y = area_pct, fill = drought_lvl_long)) +
+  geom_area(position = position_stack(reverse = TRUE)) +
+  geofacet::facet_geo(~state_abb, grid = mygrid) +
+  scale_fill_manual(values = c("#853904", "#FF0000", "#FFC100", "#FFD965", "#FFFF00"))
+```
+
+```{r}
+##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+##                                    setup                                 ----
+##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+#.........................load libraries.........................
+library(tidycensus)
+library(tidyverse)
+library(janitor)
+library(gghighlight)
+
+#.........................source API key.........................
+source(here::here("week3", "KEYS.R"))
+census_api_key(censusKEY)
+
+#..........................import data...........................
+lyme <- read_csv(here::here("week3", "data", "LD-Case-Counts-by-County-01-20.csv"))
+
+##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+##                          wrangle lyme disease data                       ----
+##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+#............wide to long (plus some other wrangling)............
+lyme_clean <- lyme |> 
+  
+  # make col names snake_case ----
+  janitor::clean_names() |> 
+  
+  # rename columns ----
+  rename(city = ctyname, state = stname, status = ststatus) |> 
+  
+  # wide to long (tidy) years
+  pivot_longer(cols = 6:25, names_to = "city_year", values_to = "reported_cases") |> 
+  
+  # remove "cases" from the year & coerce year from chr to factor ----
+  mutate(year = str_remove(city_year, pattern = "cases"),
+         year = as.factor(year)) |> 
+  
+  # select necessary cols ----
+  select(year, city, state, status, reported_cases)
+
+#................calculate total cases per state.................
+lyme_by_state <- lyme_clean |> 
+  group_by(year, state) |> 
+  summarize(total_cases = sum(reported_cases)) 
+
+##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+##                      request / wrangle population data                   ----
+##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+#...................get pop estimates by state...................
+us_state_pop <- get_estimates(geography = "state", 
+                              product = "population",
+                              state = NULL, 
+                              year = 2019) |> 
+  filter(variable == "POP") |> 
+  select(state = NAME, population = value) 
+
+#........................write data to csv.......................
+# optional, but recommended in case you want to work offline, the API is down, etc. (you can then read in your saved data file rather than run the above code)
+# write_csv(us_state_pop, file = here::here("week3", "data", "us_state_pop.csv"))
+
+##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+##                            join lyme & pop dfs                           ----
+##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+lyme_pop <- left_join(lyme_by_state, us_state_pop) |> 
+  
+  # add col with num of 100k people per state ----
+  mutate(pop100k = population/100000) |> 
+  
+  # calculate num cases per 100k people (common way of reporting disease incidence) ----
+  mutate(cases_per100k = total_cases/pop100k) 
+```
+
+```{r}
+lyme_pop |> 
+  filter(year %in% c(2010:2020)) |> 
+  ggplot(aes(x = year, y = cases_per100k, group = state)) + 
+  geom_line()
+
+lyme_pop |> 
+  filter(year %in% c(2010:2020)) |> 
+  ggplot(aes(x = year, y = cases_per100k, group = state)) + 
+  geom_line() +
+  geom_point()
+
+# just new jersey
+lyme_pop |> 
+  filter(year %in% c(2010:2020)) |> 
+  ggplot(aes(x = year, y = cases_per100k, group = state)) +
+  geom_line() +
+  gghighlight::gghighlight(state == "New Jersey") 
+
+# highlight only the ones with more than 100, "at some point thei spiked above 100k"
+lyme_pop |> 
+  filter(year %in% c(2010:2020)) |> 
+  ggplot(aes(x = year, y = cases_per100k, group = state, color = state)) + # group is always needed for a line plot
+  geom_line() +
+  gghighlight::gghighlight(max(cases_per100k) > 100) # note all the conditional sin gghighlight
+```
+
+
+# play with aspect ratio
+```{r}
+lyme_pop |> 
+  filter(year %in% c(2010:2020)) |> 
+  filter(state == "Vermont") |> 
+  ggplot(aes(x = year, y = cases_per100k, group = state)) +
+  geom_line() +
+  scale_y_continuous(breaks = seq(0, 190, by = 1)) # set breaks at each 1 unit on the y axis # this allows us to understand the difference in the magnitude of our units on both axes
+
+lyme_pop |> 
+  filter(year %in% c(2010:2020)) |> 
+  filter(state == "Vermont") |> 
+  ggplot(aes(x = year, y = cases_per100k, group = state)) +
+  geom_line() +
+  scale_y_continuous(breaks = seq(0, 190, by = 1)) +
+  coord_fixed(ratio = 1) # now aspect ratio of 1
+
+
+lyme_pop |> 
+  filter(year %in% c(2010:2020)) |> 
+  filter(state == "Vermont") |> 
+  ggplot(aes(x = year, y = cases_per100k, group = state)) +
+  geom_line() +
+  scale_y_continuous(breaks = seq(0, 190, by = 1)) +
+  coord_fixed(ratio = 1/50) # now aspect ratio of 1/50
+
+# last cut out the tick marks
+lyme_pop |> 
+  filter(year %in% c(2010:2020)) |> 
+  filter(state == "Vermont") |> 
+  ggplot(aes(x = year, y = cases_per100k, group = state)) +
+  geom_line() +
+  #scale_y_continuous(breaks = seq(0, 190, by = 1)) +
+  coord_fixed(ratio = 1/50) 
+
+```
+# area chart 1 group
+
+the only thing that matters is the top line, the fill in doesnt specify anything with one variable!
+
+```{r}
+lyme_pop |> 
+  filter(year %in% c(2010:2020)) |> 
+  filter(state == "New Jersey") |> # "any observations that are equal equal to"
+  ggplot(aes(x = year, y = cases_per100k, group = state)) +
+  geom_area() 
+
+# Expand area to panel margins
+lyme_pop |> 
+  filter(year %in% c(2010:2020)) |> 
+  filter(state == "New Jersey") |> 
+  ggplot(aes(x = year, y = cases_per100k, group = state, fill = state)) +
+  geom_area() +
+  scale_fill_manual(values = c("#047C90")) +
+  scale_x_discrete(expand = c(0, 0)) +
+  scale_y_continuous(expand = c(0, 0)) +
+  theme(legend.position = "none")
+
+```
+# area chart mult groups
+
+these are stacked on top of each other, need todo subtraction to get at each state's. Top line is totalincidence for all beneath it. 
+
+helpful when you want to show the evolution of a whole, but still weird...proportional stacked area chart is recommended
+
+```{r}
+lyme_pop |> 
+  filter(year %in% c(2010:2020)) |> 
+  filter(state %in% c("Maine", "Rhode Island", "New Hampshire", "Vermont")) |> 
+  ggplot(aes(x = year, y = cases_per100k, group = state, fill = state)) +
+  geom_area()
+
+# Proportional stacked area charts plot percentage contribution instead of absolute numbers on the y-axis
+lyme_pop |> 
+  filter(year %in% c(2010:2020)) |> 
+  filter(state %in% c("Maine", "Rhode Island", "New Hampshire", "Vermont")) |> 
+  ggplot(aes(x = year, y = cases_per100k, group = state, fill = state)) +
+  geom_area(position = "fill") +
+  scale_y_continuous(labels = scales::label_percent(scale = 100))
+```
+# can use lines instead
+```{r}
+lyme_pop |> 
+  filter(year %in% c(2010:2020)) |> 
+  filter(state %in% c("Maine", "Rhode Island", "New Hampshire", "Vermont")) |> 
+  ggplot(aes(x = year, y = cases_per100k, group = state, color = state)) +
+  geom_line() +
+  facet_wrap(~state)
+
+```
+
+

@@ -1,0 +1,163 @@
+---
+title: "lecture 4.2"
+format: html
+---
+
+```{r}
+##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+##                                    setup                                 ----
+##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+#..........................load packages.........................
+library(metajam) 
+#devtools::install_github('NCEAS/metajam')
+library(tidyverse)
+
+
+#...................download data from DataOne...................
+download_d1_data("https://cn.dataone.org/cn/v2/resolve/https%3A%2F%2Fpasta.lternet.edu%2Fpackage%2Fdata%2Feml%2Fknb-lter-hbr%2F208%2F9%2F3b3cf7ea447cb875d7c7d68ebdfd24c7",
+                 path = here::here("week4", "data")) 
+
+#  ~ NOTE: I recommend renaming the downloaded folder to 'data/' so that it's ignored by .gitignore! ~
+
+#....................read in downloaded files....................
+stream_chem_all <- read_d1_files(here::here("week4", "data"))
+
+#........................get the data file.......................
+stream_chem_data <- stream_chem_all$data
+```
+
+```{r}
+stream_chem_data |> 
+  filter(waterYr == 2021) |> 
+  ggplot(aes(x = DOC, y = pH)) + 
+  geom_point(alpha = 0.5)
+
+stream_chem_data |> 
+  filter(waterYr == 2021) |> 
+  ggplot(aes(x = DOC, y = pH)) + 
+  geom_point(alpha = 0.5) +
+  geom_rug()
+
+p1 <- stream_chem_data |> 
+  filter(waterYr == 2021) |> 
+  ggplot(aes(x = DOC, y = pH)) + 
+  geom_point(alpha = 0.5)
+
+ggExtra::ggMarginal(p1, type = "histogram")
+
+p1 <- stream_chem_data |> 
+  filter(waterYr == 2021) |> 
+  ggplot(aes(x = DOC, y = pH)) + 
+  geom_point(alpha = 0.5)
+
+ggExtra::ggMarginal(p1, type = "density")
+
+p1 <- stream_chem_data |> 
+  filter(waterYr == 2021) |> 
+  ggplot(aes(x = DOC, y = pH)) + 
+  geom_point(alpha = 0.5)
+
+ggExtra::ggMarginal(p1, type = "boxplot")
+
+p2 <- stream_chem_data |> 
+  filter(waterYr == 2021) |> 
+  ggplot(aes(x = DOC, y = pH, color = site)) + 
+  geom_point(alpha = 0.5) +
+  theme(legend.position = "bottom")
+
+ggExtra::ggMarginal(p2, type = "density", groupFill = TRUE, groupColour = TRUE)
+
+############ Trend lines
+
+stream_chem_data |> 
+  filter(waterYr == 2021) |> 
+  filter(site == "W8") |> 
+  ggplot(aes(x = DOC, y = pH)) + 
+  geom_point(alpha = 0.5) +
+  geom_smooth()
+
+## always remove the error ribbons, they are misleading
+# It’s also best to remove the confidence interval band – it can make it a bit clearer to your audience that this is just a trend line and not a properly analyzed linear model (e.g. we haven’t checked for equal variances, normality of residuals)
+
+stream_chem_data |> 
+  filter(waterYr == 2021) |> 
+  filter(site == "W8") |> 
+  ggplot(aes(x = DOC, y = pH)) + 
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "lm", se = FALSE)
+
+```
+
+# Bubble charts for visualizing a third numeric variable
+
+```{r}
+stream_chem_data |> 
+  filter(waterYr == 2021) |> 
+  ggplot(aes(x = DOC, y = pH, color = site, size = Al_ICP)) + # size = Al_ICP is bubble
+  geom_point(alpha = 0.5) +
+  labs(x = "DOC (mg/L)", size = "Al (mg/L)", color = "Site")
+
+# Use scale_size() to adjust the area range of the bubbles:
+stream_chem_data |> 
+  filter(waterYr == 2021) |> 
+  ggplot(aes(x = DOC, y = pH, color = site, size = Al_ICP)) + 
+  geom_point(alpha = 0.5) +
+  scale_size(range = c(1, 10)) +
+  labs(x = "DOC (mg/L)", size = "Al (mg/L)", color = "Site")
+
+```
+
+# Visualizing a third numeric variable using color
+```{r}
+stream_chem_data |> 
+  filter(waterYr == 2021) |> 
+  ggplot(aes(x = DOC, y = pH, color = Al_ICP)) + 
+  geom_point(alpha = 0.5, size = 2) +
+  scale_color_viridis_c() +
+  labs(x = "DOC (mg/L)", color = "Al (mg/L)")
+```
+
+# Overplotting can disguise trends...
+
+```{r}
+ggplot(stream_chem_data, aes(x = SO4, y = pH)) + 
+  geom_point()
+
+# smaller points and opacity
+ggplot(stream_chem_data, aes(x = SO4, y = pH)) + 
+  geom_point(size = 0.5, alpha = 0.3) 
+
+# Add a rug plot
+ggplot(stream_chem_data, aes(x = SO4, y = pH)) + 
+  geom_point(size = 0.5, alpha = 0.3) +
+  geom_rug()
+
+# color by group
+ggplot(stream_chem_data, aes(x = SO4, y = pH, color = site)) + 
+  geom_point(size = 0.5, alpha = 0.3) 
+
+```
+
+...Try a heatmap!
+You might imagine that you’re looking down on a histogram, where lighter areas indicate a higher density of points.
+```{r}
+# heatmap of 2d bin counts
+ggplot(stream_chem_data, aes(x = SO4, y = pH)) +
+  geom_bin2d() +
+  scale_fill_viridis_c()
+
+# hexagonal heatmap of 2d bin counts
+ggplot(stream_chem_data, aes(x = SO4, y = pH)) +
+  geom_hex() +
+  scale_fill_viridis_c()
+
+# Adjust legend appearance using guides()
+ggplot(stream_chem_data, aes(x = SO4, y = pH)) +
+  geom_hex() +
+  scale_fill_viridis_c() + 
+  guides(fill = guide_colourbar(title = "Count", 
+                                barwidth = 1, barheight = 15))
+
+```
+
