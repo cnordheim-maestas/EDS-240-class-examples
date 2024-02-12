@@ -195,6 +195,7 @@ base_map <- ggplot(joined_precip_geom) +
 
 base_map
 ```
+## Continuous map 
 
 ```{r}
 RColorBrewer::display.brewer.pal(n = 11, name = 'BrBG')
@@ -233,4 +234,39 @@ base_map +
 
 ```
 
+## Classed map 
+
+```{r}
+RColorBrewer::display.brewer.pal(n = 10, name = 'BrBG')
+
+my_brew_palette10 <- RColorBrewer::brewer.pal(n = 10, name = 'BrBG')
+my_brew_palette10
+
+# not using all 10 colors by default!
+base_map + 
+  scale_fill_stepsn(colors = my_brew_palette10,
+                    labels = scales::label_percent(scale = 1)) +
+  guides(fill = guide_colorsteps(barwidth = 25, barheight = 0.75))
+
+# lets fix this using the breaks arg...whoops it's making its own color in the zero
+base_map + 
+  scale_fill_stepsn(colors = my_brew_palette10,
+                    labels = scales::label_percent(scale = 1),
+                    breaks = scales::breaks_width(width = 10)) +
+  guides(fill = guide_colorsteps(barwidth = 25, barheight = 0.75))
+
+# Breaks set to a width of 5 & rescaled with 0 at center
+base_map + 
+  scale_fill_stepsn(colors = my_brew_palette10,
+                    labels = scales::label_percent(scale = 1),
+                    values = scales::rescale(x = c(
+                         min(na.omit(joined_precip_geom)$perc_change),
+                         0,
+                         max(na.omit(joined_precip_geom)$perc_change))), 
+                    breaks = scales::breaks_width(width = 5)) +
+  guides(fill = guide_colorsteps(barwidth = 25, barheight = 0.75))
+
+
+
+```
 
