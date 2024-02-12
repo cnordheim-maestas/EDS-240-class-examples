@@ -1,0 +1,30 @@
+---
+title: "lab4"
+format: html
+---
+
+# lab notes
+
+general note: scaterplots show correlations/trends
+
+Grid lines
+pro: allows you to see the vLues
+allows for easier pairwise comparisons for a particular value. 
+
+con: can make it messy
+better for general trends to not have them!
+without, encourages "big picture" thinking
+
+"the simpler your message the more minimalist you can be"
+
+"as your message gets more complex, the more help you need" more gridlines, borders
+
+# Backgrounds
+
+theme_gray and theme_dark: better for lighter and brighter point colors
+light backgrounds typically more clear when your colors dont need it!
+
+by removing gridlines you lose specific values
+but if looking at general trend "there is a negative relationship" then theme_classic with no grid lines is more advantageous
+
+If you like having gridlines can adjust transparency to have them be faint, for those who want it!
